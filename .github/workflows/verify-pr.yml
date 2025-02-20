@@ -3,6 +3,9 @@ name: Verify PR
 on:
   pull_request_target:
     branches: [main]
+    paths:
+      - 'mirror.txt'
+      - 'allows.txt'
 
 permissions:
   issues: write
@@ -15,40 +18,39 @@ jobs:
   verify-pr:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
       - name: Commit PR
         run: |
-          git config --global user.name "bot"
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
           wget -O pr.patch https://github.com/${{ github.repository }}/pull/${{ github.event.pull_request.number }}.patch && \
             git am -3 pr.patch &&
             rm -rf pr.patch
 
-      - name: Verify domain.txt
+      - name: Verify mirror.txt image
         run: |
-          ./hack/verify-fmt.sh domain.txt || {
-            echo "Please run './hack/fmt.sh domain.txt'"
-            gh pr comment "${{ github.event.pull_request.number }}" --body '请运行 `./hack/fmt.sh domain.txt` 对内容进行排序'
+          ./hack/verify-fmt-image.sh mirror.txt || {
+            echo "Please run './hack/fmt-image.sh mirror.txt'"
+            gh pr comment "${{ github.event.pull_request.number }}" --body '请运行 `./hack/fmt-image.sh mirror.txt` 对内容进行格式化'
             exit 1
           }
-      - name: Verify mirror.txt
+
+      - name: Verify mirror.txt sort
         run: |
           ./hack/verify-fmt.sh mirror.txt || {
             echo "Please run './hack/fmt.sh mirror.txt'"
             gh pr comment "${{ github.event.pull_request.number }}" --body '请运行 `./hack/fmt.sh mirror.txt` 对内容进行排序'
             exit 1
           }
-      - name: Verify docker Prefix
+
+      - name: Verify allows.txt sort
         run: |
-          ./hack/verify-docker-prefix.sh mirror.txt || {
-            gh pr comment "${{ github.event.pull_request.number }}" --body '请成对提交 `docker.io/*` 和 `docker.io/library/*` 形式的镜像'
+          ./hack/verify-image-match.sh allows.txt || {
+            echo "Please run './hack/fmt-image-match.sh allows.txt'"
+            gh pr comment "${{ github.event.pull_request.number }}" --body '请运行 `./hack/fmt-image-match.sh allows.txt` 对内容进行排序'
             exit 1
           }
-      - name: Verify k8s Prefix
-        run: |
-          ./hack/verify-k8s-prefix.sh mirror.txt || {
-            gh pr comment "${{ github.event.pull_request.number }}" --body '请使用 `registry.k8s.io/*` 替代 `k8s.gcr.io/*`'
-            exit 1
-          }
+
       - name: Verify Image Exists
         run: |
           ./hack/verify-image.sh mirror.txt https://github.com/${{ github.repository }}/pull/${{ github.event.pull_request.number }}.patch || {
